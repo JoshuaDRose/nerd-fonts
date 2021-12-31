@@ -864,8 +864,9 @@ class font_patcher:
         if not sym_dim['width'] or not sym_dim['height']:
             return (1.0, 1.0)
 
-        # For monospaced fonts all chars need to be maximum 'one' space wide
-        target_width = self.font_dim['width']
+        # For monospaced fonts all chars need to be maximum 'one' space wide,
+        # other fonts allows double width glyphs (for 'pa', 'x' scale target is still one space)
+        target_width = self.font_dim['width'] * (1.0 if self.args.single or stretch != 'pa' else 2.0)
         scale_ratio_x = target_width / sym_dim['width']
 
         # font_dim['height'] represents total line height, keep our symbols sized based upon font's em
@@ -970,10 +971,11 @@ class font_patcher:
             (scale_ratio_x, scale_ratio_y) = self.get_scale_factors(sym_dim, sym_attr['stretch'])
 
             # Now that we have copy/pasted the glyph, if we are creating a monospace
-            # font we need to scale and move the glyphs.  It is possible to have
-            # empty glyphs, so we need to skip those.
-            if self.args.single and sym_dim['width'] and sym_dim['height']:
-                if scaleGlyph and sym_attr['stretch'] == 'pa':
+            # font we need to scale and move the glyphs.
+
+            # It is possible to have empty glyphs, so we need to skip those.
+            if sym_dim['width'] and sym_dim['height']:
+                if scaleGlyph:
                     # We want to preserve the relative size of each glyph to other glyphs
                     # in the same symbol font.
                     scale_glyph_scale = self.get_glyph_scale(sym_glyph.unicode, scaleGlyph, symbolFont)
@@ -982,14 +984,19 @@ class font_patcher:
                 else:
                     # In this case, each glyph is sized independently to each other
                     pass
-            # end if single width
+
             if not self.args.single:
                 # any special logic we want to apply for double-width variation
                 # would go here:
-                # non monospaced fonts just scale y, on 'y' scale request (not 'pa')
-                scale_ratio_x = 1.0
-                if not 'y' in sym_attr['stretch']:
-                    scale_ratio_y = 1.0
+                # non monospaced fonts just scale down on 'pa', not up
+                if sym_attr['stretch'] == 'pa':
+                    scale_ratio_x = min(scale_ratio_x, 1.0)
+                    scale_ratio_y = min(scale_ratio_y, 1.0)
+                else:
+                    # non monospaced fonts just scale y, on 'y' scale request (not 'pa')
+                    scale_ratio_x = 1.0
+                    if not 'y' in sym_attr['stretch']:
+                        scale_ratio_y = 1.0
 
             if 'overlap' in sym_attr['params']:
                 overlap = sym_attr['params']['overlap']
